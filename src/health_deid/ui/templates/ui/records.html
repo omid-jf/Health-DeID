@@ -1,0 +1,81 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Records · {{ context.config.run.name or context.run_id }}{% endblock %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-end gap-3 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Records</h1>
+      <p class="text-secondary mb-0">Imported records in source order.</p>
+    </div>
+    <form method="get" class="d-flex align-items-end gap-2">
+      <div>
+        <label class="form-label small mb-1" for="record-status">Status</label>
+        <select class="form-select form-select-sm" id="record-status" name="status">
+          <option value="">All statuses</option>
+          {% for option in ['processing', 'awaiting_review', 'reviewed', 'ready', 'excluded', 'failed'] %}
+            <option value="{{ option }}" {% if status == option %}selected{% endif %}>{{ option|replace('_', ' ') |title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-outline-primary btn-sm" type="submit">Apply</button>
+    </form>
+  </div>
+  <section class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Row</th>
+            <th scope="col">Record ID</th>
+            <th scope="col">Entity ID</th>
+            {% for column in result.metadata_columns %}<th scope="col">{{ column }}</th>{% endfor %}
+            <th scope="col">Status</th>
+            <th scope="col"><span class="visually-hidden">Open</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in result.records %}
+            <tr>
+              <td>{{ record.source_index + 1 }}</td>
+              <td>{{ record.record_id }}</td>
+              <td>{{ record.entity_id }}</td>
+              {% for column in result.metadata_columns %}
+                <td class="text-truncate table-value"
+                    title="{{ record.metadata.get(column, '') }}">{{ record.metadata.get(column, '—') }}</td>
+              {% endfor %}
+              <td>
+                {% set color = {'ready': 'success', 'awaiting_review': 'warning', 'failed': 'danger', 'excluded': 'secondary', 'reviewed': 'info'}.get(record.status, 'primary') %}
+                <span class="badge text-bg-{{ color }} text-capitalize">{{ record.status|replace('_', ' ') }}</span>
+              </td>
+              <td class="text-end">
+                <a class="btn btn-outline-primary btn-sm"
+                   href="{{ url_for('ui.record_audit', run_id=context.run_id, record_id=record.record_id) }}">Open</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="{{ 5 + result.metadata_columns|length }}"
+                  class="text-center text-secondary py-5">No matching records.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <nav class="d-flex justify-content-between align-items-center mt-3"
+       aria-label="Record pages">
+    {% if result.page > 1 %}
+      <a class="btn btn-outline-secondary btn-sm"
+         href="{{ url_for('ui.records', run_id=context.run_id, page=result.page - 1, status=status or '') }}">Previous</a>
+    {% else %}
+      <button class="btn btn-outline-secondary btn-sm" type="button" disabled>Previous</button>
+    {% endif %}
+    <span class="small text-secondary">Page {{ result.page }} · {{ result.total }} records</span>
+    {% if result.page * result.page_size < result.total %}
+      <a class="btn btn-outline-secondary btn-sm"
+         href="{{ url_for('ui.records', run_id=context.run_id, page=result.page + 1, status=status or '') }}">Next</a>
+    {% else %}
+      <button class="btn btn-outline-secondary btn-sm" type="button" disabled>Next</button>
+    {% endif %}
+  </nav>
+{% endblock %}

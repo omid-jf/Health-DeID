@@ -1,0 +1,503 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Revise run · Health-DeID{% endblock %}
+{% block content %}
+  <div class="mb-3">
+    <h1 class="h3 mb-1">Revise run</h1>
+    <p class="text-secondary mb-0">
+      Create a new run from {{ context.config.run.name or context.run_id }}. The current run remains unchanged.
+    </p>
+  </div>
+  {% if plan %}
+    {% set detection_message = 'Paid detector results will be reused.' if plan.detection == 'reuse' else ('Paid detection is disabled.' if plan.detection == 'skip' else 'Paid detection must run again.') %}
+    <div class="alert alert-{{ 'success' if plan.detection == 'reuse' else ('secondary' if plan.detection == 'skip' else 'warning') }}">
+      <strong>{{ detection_message }}</strong>
+      {{ plan.reason }} Rules, draft de-identification, validation, review, and final de-identification will run again.
+    </div>
+  {% endif %}
+  <form method="post" id="setup-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <div class="accordion mb-3" id="revision-settings">
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#revision-general">Run and structured fields</button>
+        </h2>
+        <div class="accordion-collapse collapse show"
+             id="revision-general"
+             data-bs-parent="#revision-settings">
+          <div class="accordion-body">
+            <label class="form-label" for="run-name">Revised run name</label>
+            <input class="form-control mb-3"
+                   id="run-name"
+                   name="run_name"
+                   value="{{ form.run_name }}" />
+            {% if columns %}
+              <h3 class="h6">Structured PHI fields</h3>
+              <div class="table-responsive border rounded">
+                <table class="table align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Column</th>
+                      <th>Contains PHI</th>
+                      <th>PHI category</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for column in columns %}
+                      {% set structured = column in form.structured_columns %}
+                      <tr data-column-row="{{ column }}">
+                        <th scope="row" class="fw-semibold">{{ column }}</th>
+                        <td>
+                          <input class="form-check-input"
+                                 type="checkbox"
+                                 name="structured_columns"
+                                 value="{{ column }}"
+                                 data-structured-toggle
+                                 {% if structured %}checked{% endif %} />
+                          <input type="hidden"
+                                 name="metadata_columns"
+                                 value="{{ column }}"
+                                 data-metadata-toggle />
+                        </td>
+                        <td>
+                          <select class="form-select"
+                                  name="structured_category:{{ column }}"
+                                  data-structured-category
+                                  {% if not structured %}disabled{% endif %}>
+                            {% for category in categories %}
+                              <option value="{{ category.value }}"
+                                      {% if form.get('structured_category:' ~ column) == category.value %}selected{% endif %}>
+                                {{ category.value|replace('_', ' ') }}
+                              </option>
+                            {% endfor %}
+                          </select>
+                          <span class="text-secondary" data-not-applicable>—</span>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#revision-detection">Detection and custom rules</button>
+        </h2>
+        <div class="accordion-collapse collapse"
+             id="revision-detection"
+             data-bs-parent="#revision-settings">
+          <div class="accordion-body">
+            <div class="row g-3 mb-3">
+              <div class="col-xl-6">
+                <div class="card h-100">
+                  <div class="card-header d-flex justify-content-between">
+                    <span class="fw-semibold">AWS Comprehend Medical</span>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input"
+                             id="detector-comprehend"
+                             type="checkbox"
+                             name="detectors"
+                             value="comprehend"
+                             {% if 'comprehend' in form.detectors %}checked{% endif %} />
+                      <label class="form-check-label" for="detector-comprehend">Use</label>
+                    </div>
+                  </div>
+                  <div class="card-body row g-3">
+                    <div class="col-md-5">
+                      <label class="form-label">AWS region</label><input class="form-control"
+       name="comprehend_region"
+       value="{{ form.comprehend_region }}" />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">
+                        Min confidence
+                        <span class="text-secondary"
+                              title="Findings below this backend confidence score are excluded.">
+                          <svg xmlns="http://www.w3.org/2000/svg"
+                               width="16"
+                               height="16"
+                               fill="currentColor"
+                               class="bi bi-question-circle"
+                               viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94" />
+                          </svg>
+                        </span>
+                      </label>
+                      <input class="form-control"
+                             type="number"
+                             min="0"
+                             max="1"
+                             step="0.01"
+                             name="comprehend_confidence"
+                             value="{{ form.comprehend_confidence }}" />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Price per 100 characters</label>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input class="form-control"
+                               type="number"
+                               min="0"
+                               step="0.0001"
+                               name="comprehend_cost"
+                               value="{{ form.comprehend_cost }}" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-xl-6">
+                <div class="card h-100">
+                  <div class="card-header d-flex justify-content-between">
+                    <span class="fw-semibold">Claude Sonnet 4.6</span>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input"
+                             id="detector-sonnet"
+                             type="checkbox"
+                             name="detectors"
+                             value="sonnet"
+                             {% if 'sonnet' in form.detectors %}checked{% endif %} />
+                      <label class="form-check-label" for="detector-sonnet">Use</label>
+                    </div>
+                  </div>
+                  <div class="card-body row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label">AWS region</label><input class="form-control"
+       name="bedrock_region"
+       value="{{ form.bedrock_region }}" />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">
+                        Min confidence
+                        <span class="text-secondary"
+                              title="Findings below this backend confidence score are excluded.">
+                          <svg xmlns="http://www.w3.org/2000/svg"
+                               width="16"
+                               height="16"
+                               fill="currentColor"
+                               class="bi bi-question-circle"
+                               viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94" />
+                          </svg>
+                        </span>
+                      </label>
+                      <input class="form-control"
+                             type="number"
+                             min="0"
+                             max="1"
+                             step="0.01"
+                             name="bedrock_confidence"
+                             value="{{ form.bedrock_confidence }}" />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="bedrock-reasoning">Reasoning</label>
+                      <select class="form-select" id="bedrock-reasoning" name="bedrock_reasoning">
+                        {% for effort in ['none', 'low', 'medium', 'high'] %}
+                          <option value="{{ effort }}"
+                                  {% if form.bedrock_reasoning == effort %}selected{% endif %}>{{ 'No reasoning' if effort == 'none' else effort|title }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Price per 1M input tokens</label>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input class="form-control"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               name="bedrock_input_cost"
+                               value="{{ form.bedrock_input_cost }}" />
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Price per 1M output tokens</label>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input class="form-control"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               name="bedrock_output_cost"
+                               value="{{ form.bedrock_output_cost }}" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card mb-3">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Custom rules</span>
+                <div class="form-check form-switch">
+                  <input class="form-check-input"
+                         id="rules-enabled"
+                         type="checkbox"
+                         name="rules_enabled"
+                         value="yes"
+                         {% if form.rules_enabled in ['yes', 'on', True] %}checked{% endif %} />
+                  <label class="form-check-label" for="rules-enabled">Use</label>
+                </div>
+              </div>
+              <div class="card-body d-flex flex-wrap align-items-center gap-2">
+                <input id="rules-json"
+                       type="hidden"
+                       name="rules_json"
+                       value="{{ form.rules_json|e }}" />
+                <button class="btn btn-outline-primary"
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#rule-dialog">Manage rules</button>
+                <span class="badge text-bg-secondary" id="rule-count">0 rules</span>
+                <button class="btn btn-outline-secondary"
+                        id="view-rules-json"
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#rules-json-dialog">View JSON</button>
+                <button class="btn btn-outline-secondary"
+                        id="download-rules"
+                        type="button"
+                        disabled>Download from dashboard</button>
+                <span id="rules-import-status"></span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <span class="fw-semibold">AWS Request Handling</span>
+              </div>
+              <div class="card-body">
+                <div class="row align-items-end g-3">
+                  <div class="col-md-2">
+                    <label class="form-label" for="workers">Parallel workers</label>
+                    <input class="form-control"
+                           id="workers"
+                           type="number"
+                           min="1"
+                           max="8"
+                           name="workers"
+                           value="{{ form.workers }}" />
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label" for="retry-mode">Retry mode</label>
+                    <input class="form-control"
+                           id="retry-mode"
+                           value="{{ aws_retry_mode|title }}"
+                           readonly
+                           disabled />
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label" for="maximum-retries">
+                      Maximum retries
+                      <span class="text-secondary"
+                            title="Retries occur after the initial request.">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             width="16"
+                             height="16"
+                             fill="currentColor"
+                             class="bi bi-question-circle"
+                             viewBox="0 0 16 16">
+                          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                          <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94" />
+                        </svg>
+                      </span>
+                    </label>
+                    <input class="form-control"
+                           id="maximum-retries"
+                           value="{{ aws_max_retries }}"
+                           readonly
+                           disabled />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#revision-replacements">PHI replacements</button>
+        </h2>
+        <div class="accordion-collapse collapse"
+             id="revision-replacements"
+             data-bs-parent="#revision-settings">
+          <div class="accordion-body p-0">{% include "ui/_policy_fields.html" %}</div>
+        </div>
+      </div>
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#revision-review">Validation and review</button>
+        </h2>
+        <div class="accordion-collapse collapse"
+             id="revision-review"
+             data-bs-parent="#revision-settings">
+          <div class="accordion-body">
+            <div class="row g-3">
+              <div class="col-xl-8">
+                <div class="card h-100">
+                  <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Validation using GPT-OSS Safeguard 120B</span>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input"
+                             id="validation-enabled"
+                             type="checkbox"
+                             name="validation_enabled"
+                             value="yes"
+                             {% if form.validation_enabled in ['yes', 'on', True] %}checked{% endif %} />
+                      <label class="form-check-label" for="validation-enabled">Use</label>
+                    </div>
+                  </div>
+                  <div class="card-body row g-3" id="validator-settings">
+                    <div class="col-md-4">
+                      <label class="form-label" for="validation-region">AWS region</label>
+                      <input class="form-control"
+                             id="validation-region"
+                             name="validation_region"
+                             value="{{ form.validation_region }}" />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="validation-input-cost">Price per 1M input tokens</label>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input class="form-control"
+                               id="validation-input-cost"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               name="validation_input_cost"
+                               value="{{ form.validation_input_cost }}" />
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="validation-output-cost">Price per 1M output tokens</label>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input class="form-control"
+                               id="validation-output-cost"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               name="validation_output_cost"
+                               value="{{ form.validation_output_cost }}" />
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="validation-workers">Parallel workers</label>
+                      <input class="form-control"
+                             id="validation-workers"
+                             type="number"
+                             min="1"
+                             max="8"
+                             name="validation_workers"
+                             value="{{ form.validation_workers }}" />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="validation-retry-mode">Retry mode</label>
+                      <input class="form-control"
+                             id="validation-retry-mode"
+                             value="{{ aws_retry_mode|title }}"
+                             readonly
+                             disabled />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="validation-maximum-retries">
+                        Maximum retries
+                        <span class="text-secondary"
+                              title="Retries occur after the initial request.">
+                          <svg xmlns="http://www.w3.org/2000/svg"
+                               width="16"
+                               height="16"
+                               fill="currentColor"
+                               class="bi bi-question-circle"
+                               viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94" />
+                          </svg>
+                        </span>
+                      </label>
+                      <input class="form-control"
+                             id="validation-maximum-retries"
+                             value="{{ aws_max_retries }}"
+                             readonly
+                             disabled />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-xl-4">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <span class="fw-semibold">Human review</span>
+                  </div>
+                  <div class="card-body">
+                    {% for value, label in [('none', 'No human review'), ('findings', 'Review validation findings'), ('all', 'Review every record')] %}
+                      <div class="form-check mb-2">
+                        <input class="form-check-input"
+                               id="review-{{ value }}"
+                               type="radio"
+                               name="review_mode"
+                               value="{{ value }}"
+                               {% if form.review_mode == value %}checked{% endif %} />
+                        <label class="form-check-label" for="review-{{ value }}">{{ label }}</label>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <section class="card shadow-sm mb-3">
+      <div class="card-header">
+        <h2 class="h5 mb-0">Create revised run</h2>
+      </div>
+      <div class="card-body row g-3">
+        <div class="col-xl-8">
+          <label class="form-label" for="revision-reason">Reason</label>
+          <input class="form-control"
+                 id="revision-reason"
+                 name="reason"
+                 required
+                 placeholder="Why these settings changed" />
+        </div>
+        {% if plan and plan.requires_paid_detection %}
+          <div class="col-xl-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input"
+                     id="rerun-detection"
+                     type="checkbox"
+                     name="rerun_detection"
+                     value="yes" />
+              <label class="form-check-label" for="rerun-detection">Approve paid detector calls</label>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+    <div class="d-flex justify-content-end gap-2">
+      <a class="btn btn-outline-secondary"
+         href="{{ url_for('ui.dashboard', run_id=context.run_id) }}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Create revised run</button>
+    </div>
+  </form>
+  {% include "ui/_rules_modal.html" %}
+  <script src="{{ url_for('static', filename='setup-ui.js') }}" defer></script>
+{% endblock %}

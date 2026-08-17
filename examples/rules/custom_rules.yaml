@@ -1,0 +1,21 @@
+rules:
+  - id: facility-mdacc
+    name: Local facility acronym
+    category: LOCATION
+    type: regex
+    pattern: '\bMDACC\b'
+    ignore_case: true
+
+  - id: study-site-code
+    name: Local study site code
+    category: OTHER_ID
+    type: regex
+    pattern: '\bSITE-[A-Z]{3}-[0-9]{4}\b'
+    ignore_case: false
+
+  - id: local-device-serial
+    name: Local device serial format
+    category: ID
+    type: regex
+    pattern: '\b[0-9]{4}-[0-9]{4}\b'
+    ignore_case: false

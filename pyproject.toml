@@ -1,0 +1,127 @@
+[project]
+name = "health-deid"
+version = "1.0.0"
+description = "A local, auditable, and resumable clinical-text de-identification pipeline."
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.15"
+authors = [
+    { name = "Omid Jafari" },
+]
+keywords = [
+    "clinical-nlp",
+    "de-identification",
+    "natural-language-processing",
+    "phi",
+    "research-software",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Framework :: Flask",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Typing :: Typed",
+]
+dependencies = [
+    "boto3[crt]>=1.43.11,<2",
+    "faker>=37.12.0,<38",
+    "filelock>=3.20.0,<4",
+    "flask>=3.1.2,<4",
+    "ftfy>=6.3.1,<7",
+    "polars>=1.40.1,<2",
+    "pydantic>=2.13.4,<3",
+    "pyyaml>=6.0.3,<7",
+    "typer>=0.25.1,<1",
+]
+
+[project.urls]
+Homepage = "https://github.com/omid-jf/Health-DeID"
+Documentation = "https://omid-jf.github.io/Health-DeID/"
+Issues = "https://github.com/omid-jf/Health-DeID/issues"
+Repository = "https://github.com/omid-jf/Health-DeID"
+
+[project.scripts]
+health-deid = "health_deid.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+lint = [
+    "boto3-stubs[bedrock-runtime,comprehendmedical]>=1.43.11",
+    "djlint>=1.44.1",
+    "mypy>=2.3.0,<3",
+    "ruff>=0.16.0,<0.17",
+    "types-pyyaml>=6.0.12.20250915",
+]
+test = [
+    "pytest>=9.1.1,<10",
+    "pytest-cov>=7.1.0",
+]
+docs = [
+    "furo==2025.12.19",
+    "sphinx==9.1.0",
+    "sphinx-autobuild==2025.8.25",
+]
+dev = [
+    { include-group = "lint" },
+    { include-group = "test" },
+    { include-group = "docs" },
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+cache-dir = "~/.cache/health-deid/ruff"
+
+[tool.ruff.lint]
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "I",
+    "B",
+    "C90",
+    "UP",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra -p no:cacheprovider --cov=src/health_deid --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=100"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+
+[tool.djlint]
+profile = "jinja"
+indent = 2
+max_line_length = 100
+blank_line_after_tag = "extends"
+close_void_tags = true
+format_css = true
+format_js = false

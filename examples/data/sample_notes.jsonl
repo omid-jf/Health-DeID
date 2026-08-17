@@ -1,0 +1,6 @@
+{"note_id":"N001","patient_id":"P001","note_text":"Patient Jane Doe was seen at Northstar Medical Center on 01/15/2024. MRN: A123456. Call 713-555-0101.","service_date":"2024-01-15","note_type":"progress_note"}
+{"note_id":"N002","patient_id":"P001","note_text":"Dr. Alan Smith called Jane Doe on January 22, 2024 from the Oncology Clinic. Email jane.doe@example.com.","service_date":"2024-01-22","note_type":"telephone_note"}
+{"note_id":"N003","patient_id":"P002","note_text":"José Alvarez, age 92, lives at 100 Main St, Houston, TX 77002. Follow-up is next Friday.","service_date":"2025-03-04","note_type":"clinic_note"}
+{"note_id":"N004","patient_id":"P003","note_text":"No PHI here: patient denies fever and chills. Jackson-Pratt drain intact.","service_date":"2025-03-05","note_type":"nursing_note"}
+{"note_id":"N005","patient_id":"P004","note_text":"Seen at MDACC on 07/04/2025; study code SITE-HTX-7788 and device serial 4455-7788.","service_date":"2025-07-04","note_type":"research_note"}
+{"note_id":"N006","patient_id":"P004","note_text":"Website https://patient.example.org and IP 192.0.2.44 were documented by Dr. Priya Shah.","service_date":"2025-07-11","note_type":"administrative_note"}

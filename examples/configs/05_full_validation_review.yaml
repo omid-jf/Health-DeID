@@ -1,0 +1,51 @@
+config_version: 1
+
+run:
+  name: full-validation-review
+  output_dir: example-runs
+
+input:
+  path: examples/data/sample_notes.jsonl
+  format: jsonl
+  record_id_column: note_id
+  entity_id:
+    source: column
+    column: patient_id
+  text_column: note_text
+  metadata_columns:
+    - service_date
+    - note_type
+  structured_phi_columns:
+    service_date: DATE
+
+detection:
+  enabled: true
+  detectors:
+    - backend: aws_comprehend_medical
+      region_name: us-east-1
+      min_confidence: 0.0
+      cost_per_100_characters_usd: 0.0014
+    - backend: aws_bedrock
+      region_name: us-east-1
+      min_confidence: 0.0
+      input_cost_per_million_tokens: 3.0
+      output_cost_per_million_tokens: 15.0
+  execution:
+    workers: 2
+
+rules:
+  enabled: true
+  rules_path: examples/rules/custom_rules.yaml
+
+validation:
+  enabled: true
+  backend: aws_bedrock_safeguard
+  region_name: us-east-1
+  input_cost_per_million_tokens: 0.15
+  output_cost_per_million_tokens: 0.60
+  execution:
+    workers: 2
+
+review:
+  enabled: true
+  review_scope: all

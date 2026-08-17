@@ -1,0 +1,37 @@
+config_version: 1
+
+run:
+  name: structured-field-review-export
+  output_dir: example-runs
+
+input:
+  path: examples/data/structured_records.jsonl
+  format: jsonl
+  record_id_column: note_id
+  entity_id:
+    source: column
+    column: patient_id
+  text_column: note_text
+  metadata_columns:
+    - patient_name
+    - service_date
+    - medical_record_number
+    - note_type
+  structured_phi_columns:
+    patient_name: NAME
+    service_date: DATE
+    medical_record_number: ID
+
+detection:
+  enabled: false
+
+rules:
+  enabled: true
+  rules_path: examples/rules/custom_rules.yaml
+
+validation:
+  enabled: false
+
+review:
+  enabled: true
+  review_scope: all

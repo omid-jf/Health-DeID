@@ -1,0 +1,2 @@
+{"note_id":"S001","patient_id":"SP001","note_text":"Alice Example was seen on 03/11/2026. Record MRN-123456 was updated.","patient_name":"Alice Example","service_date":"2026-03-11","medical_record_number":"MRN-123456","note_type":"progress_note"}
+{"note_id":"S002","patient_id":"SP002","note_text":"Bob Example returned on 04/22/2026 with record MRN-654321.","patient_name":"Bob Example","service_date":"2026-04-22","medical_record_number":"MRN-654321","note_type":"follow_up"}

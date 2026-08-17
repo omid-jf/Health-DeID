@@ -1,0 +1,33 @@
+config_version: 1
+
+run:
+  name: review-all-without-validation
+  output_dir: example-runs
+
+input:
+  path: examples/data/sample_notes.jsonl
+  format: jsonl
+  record_id_column: note_id
+  entity_id:
+    source: column
+    column: patient_id
+  text_column: note_text
+  metadata_columns:
+    - service_date
+    - note_type
+  structured_phi_columns:
+    service_date: DATE
+
+detection:
+  enabled: false
+
+rules:
+  enabled: true
+  rules_path: examples/rules/custom_rules.yaml
+
+validation:
+  enabled: false
+
+review:
+  enabled: true
+  review_scope: all

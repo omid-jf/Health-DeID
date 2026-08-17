@@ -1,0 +1,74 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Review queue · Health-DeID{% endblock %}
+{% block content %}
+  <header class="d-flex justify-content-between align-items-start gap-3 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Review queue</h1>
+      <p class="text-secondary mb-0">Review records requiring a human decision before processing continues.</p>
+    </div>
+    {% if summary.pending == 0 and summary.total > 0 %}
+      <form method="post"
+            action="{{ url_for('ui.complete_review', run_id=context.run_id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button class="btn btn-primary" type="submit">Finish review and continue</button>
+      </form>
+    {% endif %}
+  </header>
+  <section class="row g-3 mb-3">
+    {% for label, value in [
+      ('Required', summary.total), ('Awaiting review', summary.pending),
+      ('Reviewed', summary.reviewed), ('Total review time', summary.total_seconds|duration)
+    ] %}
+      <div class="col-6 col-xl-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <div class="small text-secondary">{{ label }}</div>
+            <div class="h4 mb-0">{{ value }}</div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+  <section class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Record ID</th>
+            <th>Entity ID</th>
+            <th>Decision</th>
+            <th>Review time</th>
+            <th><span class="visually-hidden">Open</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in summary['items'] %}
+            <tr>
+              <td>{{ item.source_index + 1 }}</td>
+              <td class="fw-semibold">{{ item.record_id }}</td>
+              <td>{{ item.entity_id }}</td>
+              <td>
+                {% if item.disposition %}
+                  <span class="badge text-bg-success text-capitalize">{{ item.disposition|replace('_', ' ') }}</span>
+                {% else %}
+                  <span class="badge text-bg-warning">Awaiting review</span>
+                {% endif %}
+              </td>
+              <td>{{ item.review_seconds|duration }}</td>
+              <td class="text-end">
+                <a class="btn btn-{{ 'outline-primary' if item.disposition else 'primary' }} btn-sm"
+                   href="{{ url_for('ui.review_record', run_id=context.run_id, record_id=item.record_id) }}">{{ 'Edit' if item.disposition else 'Review' }}</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-secondary py-5">No records require review.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

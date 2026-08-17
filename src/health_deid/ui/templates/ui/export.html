@@ -1,0 +1,206 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Export · Health-DeID{% endblock %}
+{% block content %}
+  <div class="mb-3">
+    <h1 class="h3 mb-1">Export records</h1>
+    <p class="text-secondary mb-0">Choose the records, format, and columns explicitly.</p>
+  </div>
+  <form method="post" id="export-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <div class="row g-3">
+      <div class="col-xl-4">
+        <section class="card shadow-sm mb-3">
+          <div class="card-header">
+            <h2 class="h5 mb-0">Output</h2>
+          </div>
+          <div class="card-body">
+            <label class="form-label" for="export-directory">Folder</label>
+            <input class="form-control mb-3"
+                   id="export-directory"
+                   value="{{ context.exports_dir }}"
+                   readonly
+                   aria-describedby="export-directory-help" />
+            <div class="form-text mb-3" id="export-directory-help">Exports stay inside this run.</div>
+            <label class="form-label" for="output-filename">Filename</label>
+            <input class="form-control"
+                   id="output-filename"
+                   name="output_filename"
+                   value="final.parquet"
+                   required />
+            <label class="form-label mt-3" for="export-format">Format</label>
+            <select class="form-select" id="export-format" name="format">
+              <option value="parquet">Parquet</option>
+              <option value="jsonl">JSONL</option>
+            </select>
+          </div>
+        </section>
+        <section class="card shadow-sm mb-3">
+          <div class="card-header">
+            <h2 class="h5 mb-0">Records</h2>
+          </div>
+          <div class="card-body">
+            <div class="form-check mb-3">
+              <input class="form-check-input"
+                     id="ready-only"
+                     type="radio"
+                     name="mode"
+                     value="ready_only"
+                     checked />
+              <label class="form-check-label" for="ready-only">
+                <strong>Ready records only</strong>
+                <br />
+                <span class="small text-secondary">{{ ready_count }} records · Recommended</span>
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input"
+                     id="all-records"
+                     type="radio"
+                     name="mode"
+                     value="all_records" />
+              <label class="form-check-label" for="all-records">
+                <strong>All records</strong>
+                <br />
+                <span class="small text-secondary">{{ total_count }} records, including unresolved, failed, and excluded</span>
+              </label>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="col-xl-8">
+        <section class="card shadow-sm mb-3">
+          <div class="card-header">
+            <h2 class="h5 mb-0">Columns</h2>
+          </div>
+          <div class="card-body">
+            <fieldset class="mb-4">
+              <legend class="h6">De-identified output</legend>
+              <div class="row row-cols-2 row-cols-xxl-3 g-2">
+                {% for column in output_columns %}
+                  <div class="col">
+                    <div class="form-check">
+                      <input class="form-check-input"
+                             id="column-{{ column }}"
+                             type="checkbox"
+                             name="selected_columns"
+                             value="{{ column }}"
+                             checked /><label class="form-check-label" for="column-{{ column }}">{{ column }}</label>
+                    </div>
+                  </div>
+                {% endfor %}
+                {% for column in metadata_columns if column in structured_columns %}
+                  <div class="col">
+                    <div class="form-check">
+                      <input class="form-check-input"
+                             id="column-{{ column }}"
+                             type="checkbox"
+                             name="selected_columns"
+                             value="{{ column }}"
+                             checked /><label class="form-check-label" for="column-{{ column }}">{{ column }} <span class="badge text-bg-info">structured PHI</span></label>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </fieldset>
+            <fieldset class="mb-4">
+              <legend class="h6">Identifiers and status</legend>
+              <div class="row row-cols-2 row-cols-xxl-3 g-2">
+                {% for column in identifier_columns %}
+                  <div class="col">
+                    <div class="form-check">
+                      <input class="form-check-input"
+                             id="column-{{ column }}"
+                             type="checkbox"
+                             name="selected_columns"
+                             value="{{ column }}"
+                             checked /><label class="form-check-label" for="column-{{ column }}">{{ column }}</label>
+                    </div>
+                  </div>
+                {% endfor %}
+                {% for column in operational_columns %}
+                  <div class="col">
+                    <div class="form-check">
+                      <input class="form-check-input"
+                             id="column-{{ column }}"
+                             type="checkbox"
+                             name="selected_columns"
+                             value="{{ column }}"
+                             {% if column == 'deid_status' %}checked{% endif %} />
+                      <label class="form-check-label" for="column-{{ column }}">{{ 'input_row_number' if column == 'input_row_number' else column }}</label>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </fieldset>
+            <fieldset class="mb-4">
+              <legend class="h6">Additional metadata</legend>
+              <div class="row row-cols-2 row-cols-xxl-3 g-2">
+                {% for column in metadata_columns if column not in structured_columns %}
+                  <div class="col">
+                    <div class="form-check">
+                      <input class="form-check-input"
+                             id="metadata-{{ loop.index }}"
+                             type="checkbox"
+                             name="selected_columns"
+                             value="{{ column }}" />
+                      <label class="form-check-label" for="metadata-{{ loop.index }}">{{ column }}</label>
+                    </div>
+                  </div>
+                {% else %}
+                  <p class="text-secondary mb-0">No additional metadata fields.</p>
+                {% endfor %}
+              </div>
+            </fieldset>
+            <div class="accordion" id="original-columns">
+              <div class="accordion-item border-danger">
+                <h3 class="accordion-header">
+                  <button class="accordion-button collapsed text-danger"
+                          type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#original-columns-body">Original fields — contains PHI</button>
+                </h3>
+                <div class="accordion-collapse collapse"
+                     id="original-columns-body"
+                     data-bs-parent="#original-columns">
+                  <div class="accordion-body">
+                    <div class="row row-cols-2 g-2">
+                      {% for column in source_text_columns %}
+                        <div class="col">
+                          <div class="form-check">
+                            <input class="form-check-input"
+                                   id="raw-{{ column }}"
+                                   type="checkbox"
+                                   name="selected_columns"
+                                   value="{{ column }}" />
+                            <label class="form-check-label" for="raw-{{ column }}">{{ column }}</label>
+                          </div>
+                        </div>
+                      {% endfor %}
+                      {% for column in raw_structured_columns %}
+                        <div class="col">
+                          <div class="form-check">
+                            <input class="form-check-input"
+                                   id="raw-structured-{{ loop.index }}"
+                                   type="checkbox"
+                                   name="selected_columns"
+                                   value="{{ column }}" />
+                            <label class="form-check-label" for="raw-structured-{{ loop.index }}">{{ column }}</label>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <div class="d-flex justify-content-end">
+          <button class="btn btn-primary" type="submit">Export records</button>
+        </div>
+      </div>
+    </div>
+  </form>
+  <script src="{{ url_for('static', filename='export-ui.js') }}" defer></script>
+{% endblock %}

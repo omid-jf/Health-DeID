@@ -1,0 +1,61 @@
+config_version: 1
+
+run:
+  name: embedded-rules-structured-fields
+  output_dir: example-runs
+
+input:
+  path: examples/data/structured_records.jsonl
+  format: jsonl
+  record_id_column: note_id
+  entity_id:
+    source: column
+    column: patient_id
+  text_column: note_text
+  metadata_columns:
+    - patient_name
+    - service_date
+    - medical_record_number
+    - note_type
+  structured_phi_columns:
+    patient_name: NAME
+    service_date: DATE
+    medical_record_number: ID
+
+detection:
+  enabled: false
+
+rules:
+  enabled: true
+  embedded:
+    rules:
+      - id: alice-name
+        name: Alice Example
+        category: NAME
+        type: exact
+        pattern: Alice Example
+        ignore_case: false
+      - id: bob-name
+        name: Bob Example
+        category: NAME
+        type: exact
+        pattern: Bob Example
+        ignore_case: false
+      - id: example-mrn
+        name: Example medical record number
+        category: ID
+        type: regex
+        pattern: '\bMRN-[0-9]{6}\b'
+        ignore_case: false
+      - id: example-date
+        name: Example unstructured service dates
+        category: DATE
+        type: regex
+        pattern: '\b[0-9]{2}/[0-9]{2}/[0-9]{4}\b'
+        ignore_case: false
+
+validation:
+  enabled: false
+
+review:
+  enabled: false

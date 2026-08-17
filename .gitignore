@@ -1,0 +1,32 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Tool caches and local test output
+.coverage*
+coverage.xml
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Documentation output
+docs/_build/
+
+# Local runs and generated research output
+runs/
+example-runs/
+*.sqlite
+examples/outputs/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.vscode/

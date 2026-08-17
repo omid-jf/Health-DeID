@@ -1,0 +1,84 @@
+<div class="modal fade"
+     id="rule-dialog"
+     tabindex="-1"
+     aria-labelledby="rule-dialog-title"
+     aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="rule-dialog-title">Custom rules</h2>
+        <button class="btn-close"
+                type="button"
+                data-bs-dismiss="modal"
+                aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="list-group mb-4" id="rule-list"></div>
+        <div class="border-top pt-3">
+          <h3 class="h6" id="rule-editor-heading">Add rule</h3>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="rule-name">Name</label>
+              <input class="form-control" id="rule-name" placeholder="Hospital name" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="rule-category">PHI category</label>
+              <select class="form-select" id="rule-category">
+                {% for category in categories %}
+                  <option value="{{ category.value }}">{{ category.value|replace('_', ' ') }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="rule-type">Match</label>
+              <select class="form-select" id="rule-type">
+                <option value="exact">Exact text</option>
+                <option value="regex">Regular expression</option>
+              </select>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label" for="rule-pattern">Text or expression</label>
+              <input class="form-control" id="rule-pattern" />
+            </div>
+            <div class="col-12">
+              <div class="form-check form-switch">
+                <input class="form-check-input"
+                       id="rule-ignore-case"
+                       type="checkbox"
+                       role="switch" />
+                <label class="form-check-label" for="rule-ignore-case">Ignore letter case</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary me-auto" id="new-rule" type="button">Clear editor</button>
+        <button class="btn btn-outline-secondary"
+                type="button"
+                data-bs-dismiss="modal">Close</button>
+        <button class="btn btn-primary" id="save-rule" type="button">Add rule</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade"
+     id="rules-json-dialog"
+     tabindex="-1"
+     aria-labelledby="rules-json-dialog-title"
+     aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="rules-json-dialog-title">Rules JSON</h2>
+        <button class="btn-close"
+                type="button"
+                data-bs-dismiss="modal"
+                aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <pre class="bg-body-tertiary border rounded p-3 mb-0" id="rules-json-view"></pre>
+      </div>
+    </div>
+  </div>
+</div>

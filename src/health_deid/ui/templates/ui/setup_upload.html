@@ -1,0 +1,64 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Create run · Health-DeID{% endblock %}
+{% block content %}
+  <div class="mb-3">
+    <h1 class="h3 mb-1">New run</h1>
+    <p class="text-secondary mb-0">Start from input data, an existing run configuration, or both.</p>
+  </div>
+  <form method="post"
+        action="{{ url_for("ui.upload_source") }}"
+        enctype="multipart/form-data"
+        id="upload-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <div class="row mb-3">
+      <div class="col-6">
+        <div class="card h-100 shadow-sm">
+          <div class="card-header">
+            <h2 class="h5 mb-0">Input data</h2>
+          </div>
+          <div class="card-body d-flex flex-column">
+            <p class="text-secondary">
+              Upload a Parquet or JSONL file. You may leave this blank
+              if the configuration references an input file already.
+            </p>
+            <div class="mt-auto">
+              <label class="form-label fw-semibold" for="source-upload">Input file</label>
+              <input id="source-upload"
+                     class="form-control"
+                     name="source"
+                     type="file"
+                     accept=".parquet,.jsonl" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="card h-100 shadow-sm">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h2 class="h5 mb-0">Configuration YAML</h2>
+            <span class="small text-secondary">Optional</span>
+          </div>
+          <div class="card-body d-flex flex-column">
+            <p class="text-secondary">
+              Load existing settings into the editor. They remain fully
+              editable before the run starts.
+            </p>
+            <div class="mt-auto">
+              <label class="form-label fw-semibold" for="config-upload">Configuration file</label>
+              <input id="config-upload"
+                     class="form-control"
+                     name="config_file"
+                     type="file"
+                     accept=".yaml,.yml" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="d-flex justify-content-end gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for("ui.home") }}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Continue</button>
+    </div>
+  </form>
+{% endblock %}

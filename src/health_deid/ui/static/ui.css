@@ -1,0 +1,57 @@
+:root {
+  --health-deid-brand: #1c3079;
+}
+
+body {
+  background-color: #e9ecef;
+}
+
+.navbar,
+.app-footer {
+  background-color: var(--health-deid-brand);
+}
+
+.app-main {
+  min-height: 0;
+}
+
+.app-main h1 {
+  color: var(--health-deid-brand);
+}
+
+.note-text {
+  max-height: 32rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+
+.review-source {
+  min-height: 24rem;
+}
+
+.phi-mark {
+  display: inline;
+  padding: 0 .15rem;
+  border: 0;
+  border-bottom: 2px solid;
+  border-radius: .2rem;
+  font: inherit;
+}
+
+.phi-mark::after {
+  content: attr(data-phi-label);
+  margin-left: .25rem;
+  font-size: .65em;
+  font-weight: 700;
+  vertical-align: .1em;
+}
+
+.table-value {
+  max-width: 16rem;
+}
+
+.timer-input {
+  width: 7rem;
+}

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description"
+          content="Local clinical-text de-identification research software." />
+    <title>{% block title %}Health-DeID{% endblock %}</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='vendor/bootstrap-5.3.8.min.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}" />
+    <script src="{{ url_for('static', filename='vendor/bootstrap-5.3.8.bundle.min.js') }}"
+            defer></script>
+    <script src="{{ url_for('static', filename='local-time.js') }}" defer></script>
+  </head>
+  <body class="d-flex flex-column vh-100 overflow-hidden">
+    <nav class="navbar navbar-expand flex-shrink-0" data-bs-theme="dark">
+      <div class="container-fluid gap-3">
+        <a class="navbar-brand" href="{{ url_for("ui.home") }}">
+          Health-DeID <span class="small opacity-75">({{ app_version }})</span>
+        </a>
+        <a class="btn btn-outline-light btn-sm" href="{{ url_for("ui.setup") }}">New run</a>
+        {% if active_run %}
+          <span class="navbar-text border-start ps-3 text-truncate">
+            {{ active_run.config.run.name or active_run.run_id }}
+          </span>
+          <div class="navbar-nav flex-row gap-1">
+            <a class="nav-link {% if active_endpoint == 'ui.dashboard' %}active{% endif %}"
+               href="{{ url_for('ui.dashboard', run_id=active_run.run_id) }}">Dashboard</a>
+            <a class="nav-link {% if active_endpoint in ['ui.records', 'ui.record_audit'] %}active{% endif %}"
+               href="{{ url_for('ui.records', run_id=active_run.run_id) }}">Records</a>
+            {% if active_run.config.validation.enabled or active_run.config.review.enabled %}
+              <a class="nav-link {% if active_endpoint in ['ui.review_queue', 'ui.review_record'] %}active{% endif %}"
+                 href="{{ url_for('ui.review_queue', run_id=active_run.run_id) }}">Review</a>
+            {% endif %}
+            <a class="nav-link {% if active_endpoint == 'ui.export' %}active{% endif %}"
+               href="{{ url_for('ui.export', run_id=active_run.run_id) }}">Export</a>
+            <a class="nav-link {% if active_endpoint == 'ui.settings' %}active{% endif %}"
+               href="{{ url_for('ui.settings', run_id=active_run.run_id) }}">Revise</a>
+          </div>
+        {% endif %}
+        <span class="navbar-text ms-auto text-nowrap">Reviewer: {{ reviewer_id }}</span>
+      </div>
+    </nav>
+    <main class="container-fluid py-3 px-4 flex-grow-1 overflow-auto app-main">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show"
+               role="alert">
+            {{ message }}
+            <button class="btn-close"
+                    type="button"
+                    data-bs-dismiss="alert"
+                    aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="app-footer flex-shrink-0 text-light py-3">
+      <div class="container-fluid d-flex justify-content-between px-4 small">
+        <span>
+          © 2026 Copyright:
+          <a class="text-light"
+             href="https://omidjafari.com"
+             target="_blank"
+             rel="noopener noreferrer">Omid Jafari</a>
+          · Research affiliation:
+          <a class="text-light"
+             href="https://angli-lab.com/"
+             target="_blank"
+             rel="noopener noreferrer">Ang Li Lab</a>
+        </span>
+        <span>Local application · Intended for research use only</span>
+      </div>
+    </footer>
+  </body>
+</html>

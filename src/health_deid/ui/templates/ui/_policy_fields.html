@@ -1,0 +1,104 @@
+<div class="card shadow-sm">
+  <div class="card-header">
+    <h2 class="h5 mb-0">PHI replacements</h2>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th scope="col">Category</th>
+          <th scope="col">Replacement</th>
+          <th scope="col">Consistency</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for category in categories %}
+          {% set selected = form.get('replacement:' ~ category.value, 'redact') %}
+          <tr data-policy-row>
+            <th scope="row" class="fw-semibold">{{ category.value|replace('_', ' ') }}</th>
+            <td>
+              <select class="form-select"
+                      name="replacement:{{ category.value }}"
+                      data-replacement>
+                <option value="retain" {% if selected == 'retain' %}selected{% endif %}>Keep original</option>
+                <option value="redact" {% if selected == 'redact' %}selected{% endif %}>Redact</option>
+                {% if category.value == 'DATE' %}
+                  <option value="year_only" {% if selected == 'year_only' %}selected{% endif %}>Keep year only</option>
+                  <option value="date_shift"
+                          {% if selected == 'date_shift' %}selected{% endif %}>Shift date</option>
+                {% else %}
+                  {% if category.value == 'AGE' %}
+                    <option value="age_90_plus"
+                            {% if selected == 'age_90_plus' %}selected{% endif %}>Generalize age 90+</option>
+                  {% endif %}
+                  <option value="faker" {% if selected == 'faker' %}selected{% endif %}>Random synthetic value</option>
+                  <option value="custom_list"
+                          {% if selected == 'custom_list' %}selected{% endif %}>Value from list</option>
+                {% endif %}
+              </select>
+              <input type="hidden"
+                     name="secret_reference:{{ category.value }}"
+                     value="{{ form.get('secret_reference:' ~ category.value, '') }}" />
+              {% if category.value != 'DATE' %}
+                <div class="mt-2" data-list-setting>
+                  <label class="visually-hidden" for="values-{{ category.value }}">Replacement values</label>
+                  <textarea class="form-control"
+                            id="values-{{ category.value }}"
+                            name="custom_values:{{ category.value }}"
+                            rows="3"
+                            placeholder="One unique value per line">{{ form.get('custom_values:' ~ category.value, '') }}</textarea>
+                </div>
+              {% endif %}
+            </td>
+            <td>
+              {% if category.value != 'DATE' %}
+                <div data-consistency-setting>
+                  <select class="form-select" name="consistency:{{ category.value }}">
+                    {% set consistency = form.get('consistency:' ~ category.value, 'entity') %}
+                    <option value="entity" {% if consistency == 'entity' %}selected{% endif %}>Within entity</option>
+                    <option value="record" {% if consistency == 'record' %}selected{% endif %}>Within record</option>
+                    <option value="occurrence"
+                            {% if consistency == 'occurrence' %}selected{% endif %}>Each occurrence</option>
+                  </select>
+                </div>
+              {% else %}
+                <span class="text-secondary" data-date-setting>Within entity</span>
+              {% endif %}
+              <span class="text-secondary" data-no-consistency>—</span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-body border-top" data-date-range>
+    <h3 class="h6">Date shift</h3>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label" for="date-minimum-weeks">Minimum weeks</label>
+        <input class="form-control"
+               id="date-minimum-weeks"
+               type="number"
+               name="date_minimum_weeks"
+               value="{{ form.date_minimum_weeks }}" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="date-maximum-weeks">Maximum weeks</label>
+        <input class="form-control"
+               id="date-maximum-weeks"
+               type="number"
+               name="date_maximum_weeks"
+               value="{{ form.date_maximum_weeks }}" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="date-fallback">Unparseable dates</label>
+        <select class="form-select" id="date-fallback" name="date_fallback">
+          <option value="year_only"
+                  {% if form.date_fallback == 'year_only' %}selected{% endif %}>Keep year only</option>
+          <option value="redact"
+                  {% if form.date_fallback == 'redact' %}selected{% endif %}>Redact</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>

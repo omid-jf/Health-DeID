@@ -1,0 +1,448 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Dashboard · {{ context.config.run.name or context.run_id }}{% endblock %}
+{% block content %}
+  {% set status_colors = {
+    "awaiting_review": "warning",
+    "blocked": "danger",
+    "completed": "success",
+    "completed_with_errors": "warning",
+    "failed": "danger",
+    "processing": "primary",
+    "ready": "success",
+    "reviewed": "info",
+    "running": "primary",
+    "completed_in_this_run": "success"
+  } %}
+  {% set stage_labels = {
+    "input": "Input",
+    "detection": "PHI detection",
+    "transformation": "Draft de-identification",
+    "validation": "Validation",
+    "review": "Human review",
+    "finalization": "Final de-identification",
+    "export": "Export"
+  } %}
+  {% set stage_descriptions = {
+    "input": "Imports and normalizes source records.",
+    "detection": "Finds PHI spans with detectors and custom rules.",
+    "transformation": "Creates the de-identified draft used for validation and review.",
+    "validation": "Checks the draft text for residual PHI.",
+    "review": "Applies the required human decisions and corrections.",
+    "finalization": "Applies approved redactions, generalizations, and synthetic replacements.",
+    "export": "Writes selected ready records to a file."
+  } %}
+  {% set progress_labels = {
+    "skipped": "Not required",
+    "completed": "Completed in this run",
+    "completed_with_errors": "Completed in this run",
+    "running": "In progress"
+  } %}
+  <header class="d-flex justify-content-between align-items-start gap-3 mb-3">
+    <div>
+      <h1 class="h3 mb-1">{{ context.config.run.name or context.run_id }}</h1>
+      <p class="small text-secondary font-monospace mb-0">{{ context.run_id }}</p>
+    </div>
+    <div class="d-flex flex-wrap justify-content-end gap-2">
+      {% if report.action %}
+        {% if report.action.kind == 'review' %}
+          <a class="btn btn-primary"
+             href="{{ url_for('ui.review_queue', run_id=context.run_id) }}">Review records</a>
+        {% elif report.action.kind == 'retry' %}
+          <form method="post"
+                action="{{ url_for('ui.retry_failed', run_id=context.run_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button class="btn btn-primary" type="submit">Retry failures</button>
+          </form>
+        {% elif report.action.kind == 'continue' %}
+          <form method="post"
+                action="{{ url_for('ui.resume_run', run_id=context.run_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button class="btn btn-primary" type="submit">Continue processing</button>
+          </form>
+        {% endif %}
+      {% endif %}
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle"
+                type="button"
+                data-bs-toggle="dropdown">Files</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li>
+            <a class="dropdown-item"
+               href="{{ url_for('ui.download_run_configuration', run_id=context.run_id) }}">Download configuration YAML</a>
+          </li>
+          <li>
+            <button class="dropdown-item"
+                    type="button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#configuration-dialog">View configuration JSON</button>
+          </li>
+          {% if rules_json %}
+            <li>
+              <hr class="dropdown-divider" />
+            </li>
+            <li>
+              <a class="dropdown-item"
+                 href="{{ url_for('ui.download_run_rules', run_id=context.run_id) }}">Download rules YAML</a>
+            </li>
+            <li>
+              <button class="dropdown-item"
+                      type="button"
+                      data-bs-toggle="modal"
+                      data-bs-target="#rules-dialog">View rules JSON</button>
+            </li>
+          {% endif %}
+          <li>
+            <hr class="dropdown-divider" />
+          </li>
+          <li>
+            <button class="dropdown-item"
+                    id="download-report-json"
+                    type="button"
+                    data-filename="{{ context.run_id }}-technical-report.json">Download technical report JSON</button>
+          </li>
+          <li>
+            <button class="dropdown-item"
+                    type="button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#report-dialog">View technical report JSON</button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </header>
+  {% if rules_error %}<div class="alert alert-warning"><strong>Rules unavailable:</strong> {{ rules_error }}</div>{% endif %}
+  {% if report.lineage %}
+    <div class="alert alert-secondary d-flex justify-content-between align-items-center gap-3">
+      <div>
+        <strong>Revised run.</strong> Created from <code>{{ report.lineage.parent_run_id }}</code>.
+        {{ report.lineage.reason }}
+      </div>
+      <a class="btn btn-outline-secondary btn-sm"
+         href="{{ url_for('ui.dashboard', run_id=report.lineage.parent_run_id) }}">Open parent</a>
+    </div>
+  {% endif %}
+  {% if job.state == 'running' %}
+    <div class="alert alert-info d-flex align-items-center gap-2"
+         role="status">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      Processing {{ job.operation|replace('_', ' ') }}
+    </div>
+  {% endif %}
+  <section class="row g-3 mb-3"
+           id="live-summary"
+           data-status-url="{{ url_for('ui.status_api', run_id=context.run_id) }}"
+           data-run-status="{{ report.run.status }}"
+           data-job-state="{{ job.state }}"
+           aria-live="polite">
+    {% for label, value, id in [
+      ('Run status', report.run.status|replace('_', ' '), 'run-status'),
+      ('Records', report.records.denominator, 'record-total'),
+      ('Awaiting review', report.review.pending, 'review-count'),
+      ('Ready', report.records.exportable, 'exportable-count')
+    ] %}
+      <div class="col-6 col-xl-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <div class="small text-secondary mb-1">{{ label }}</div>
+            {% if id == 'run-status' %}
+              <span class="badge fs-6 fw-normal text-capitalize text-bg-{{ status_colors.get(report.run.status, 'secondary') }}"
+                    id="{{ id }}">{{ value }}</span>
+            {% else %}
+              <div class="h4 mb-0" id="{{ id }}">{{ value }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+  {% if report.errors.unresolved %}
+    <section class="alert alert-danger mb-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <strong>{{ report.errors.unresolved }} unresolved processing error{{ 's' if report.errors.unresolved != 1 }}</strong>
+        {% if report.errors.retryable %}
+          <form method="post"
+                action="{{ url_for('ui.retry_failed', run_id=context.run_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button class="btn btn-danger btn-sm" type="submit">Retry</button>
+          </form>
+        {% endif %}
+      </div>
+      <div class="accordion accordion-flush mt-2" id="errors">
+        {% for error in report.errors.groups if not error.resolved %}
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#error-{{ loop.index }}">
+                {{ error.error_class }} · {{ error.stage_name|replace('_', ' ') }} · {{ error.occurrences }} occurrence{{ 's' if error.occurrences != 1 }}
+              </button>
+            </h2>
+            <div class="accordion-collapse collapse"
+                 id="error-{{ loop.index }}"
+                 data-bs-parent="#errors">
+              <div class="accordion-body">{{ error.message }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+  <div class="row g-3 mb-3">
+    <div class="col-xl-5">
+      <section class="card h-100 shadow-sm">
+        <div class="card-header">
+          <h2 class="h5 mb-0">Workflow progress</h2>
+        </div>
+        <ol class="list-group list-group-numbered list-group-flush">
+          {% set always_visible = ["input", "transformation", "finalization", "export"] %}
+          {% for stage in report.stages.run %}
+            {% if stage.stage_name in always_visible or report.configured_sections.get(stage.stage_name, False) %}
+              <li class="list-group-item d-flex justify-content-between align-items-center gap-3 py-3">
+                <div class="ms-2 me-auto">
+                  <div class="d-flex align-items-baseline gap-2">
+                    <span class="fw-semibold">{{ stage_labels.get(stage.stage_name, stage.stage_name|replace('_', ' ')) }}</span>
+                    <small class="text-secondary">
+                      {{ 'Reused from parent' if stage.provenance == 'reused_from_parent' else progress_labels.get(stage.status, 'Waiting') }}
+                    </small>
+                  </div>
+                  <small class="text-secondary">{{ stage_descriptions.get(stage.stage_name, '') }}</small>
+                </div>
+                <span class="badge text-bg-{{ status_colors.get(stage.status, 'secondary') }} text-capitalize">{{ stage.status|replace('_', ' ') }}</span>
+              </li>
+            {% endif %}
+          {% endfor %}
+        </ol>
+      </section>
+    </div>
+    <div class="col-xl-7">
+      <section class="card h-100 shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h2 class="h5 mb-0">PHI findings</h2>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Category</th>
+                <th class="text-end">Spans</th>
+                <th class="text-end">Records</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in report.findings.counts %}
+                <tr>
+                  <td class="text-capitalize">{{ item.source_kind|replace('_', ' ') }}</td>
+                  <td>{{ item.canonical_category|replace('_', ' ') }}</td>
+                  <td class="text-end">{{ item.active_span_count }}</td>
+                  <td class="text-end">{{ item.active_record_count }}</td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="4" class="text-center text-secondary py-4">No findings recorded.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+  {% if report.configured_sections.validation or report.configured_sections.review %}
+    <div class="row g-3 mb-3">
+      {% if report.configured_sections.validation %}
+        <div class="col-xl-6">
+          <section class="card h-100 shadow-sm">
+            <div class="card-header">
+              <h2 class="h5 mb-0">Validation findings</h2>
+            </div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item d-flex justify-content-between"><span>Records checked</span><span>{{ report.validation.completed }}</span></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Records with findings</span><span>{{ report.validation.effective_violations }}</span></li>
+              <li class="list-group-item d-flex justify-content-between">
+                <span title="The validator flagged these values, but their PHI categories are configured to remain unchanged.">Findings configured to retain</span>
+                <span>{{ report.validation.ignored_findings }}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between"><span>Technical failures</span><span>{{ report.validation.technical_errors + report.validation.truncated }}</span></li>
+            </ul>
+          </section>
+        </div>
+      {% endif %}
+      {% if report.configured_sections.review %}
+        <div class="col-xl-6">
+          <section class="card h-100 shadow-sm">
+            <div class="card-header">
+              <h2 class="h5 mb-0">Human review</h2>
+            </div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item d-flex justify-content-between"><span>Awaiting review</span><span>{{ report.review.pending }}</span></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Completed</span><span>{{ report.review.completed }}</span></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Total time</span><span>{{ report.review.review_seconds|duration }}</span></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Average time</span><span>{{ report.review.average_seconds|duration }}</span></li>
+            </ul>
+          </section>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+  {% if report.usage.backends %}
+    <section class="mb-3">
+      <div class="d-flex justify-content-between align-items-baseline mb-2">
+        <h2 class="h5 mb-0">
+          Service usage
+          <small class="text-secondary">(Includes successful, failed, and truncated calls when usage is available)</small>
+        </h2>
+      </div>
+      <div class="row g-3">
+        {% for backend in report.usage.backends %}
+          <div class="col-xl-4">
+            <article class="card h-100 shadow-sm {% if backend.provenance == 'reused_from_parent' %}border-info{% endif %}">
+              <div class="card-header d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <h3 class="h6 mb-1">
+                    {{ backend.name|replace('_', ' ') |title }}
+                    <small class="text-secondary">({{ backend.model_versions|join(", ") }})</small>
+                  </h3>
+                </div>
+                {% if backend.provenance == 'reused_from_parent' %}<span class="badge text-bg-info">Reused</span>{% endif %}
+              </div>
+              <div class="card-body">
+                <div class="display-6 fs-3 mb-3">
+                  {% if backend.actual_cost_usd is defined %}${{ '%.6f'|format(backend.actual_cost_usd) }}{% else %}<span class="text-secondary">Not priced</span>{% endif %}
+                </div>
+                <dl class="row small mb-0">
+                  <dt class="col-7 fw-normal text-secondary">Requests</dt>
+                  <dd class="col-5 text-end">
+                    {{ backend.request_count }}
+                  </dd>
+                  <dt class="col-7 fw-normal text-secondary">Succeeded / failed</dt>
+                  <dd class="col-5 text-end">
+                    {{ backend.successful_requests }} / {{ backend.error_requests }}
+                  </dd>
+                  {% if backend.input_tokens is defined %}
+                    <dt class="col-7 fw-normal text-secondary">Input tokens</dt>
+                    <dd class="col-5 text-end">
+                      {{ backend.input_tokens }}
+                    </dd>
+                    <dt class="col-7 fw-normal text-secondary">Output tokens</dt>
+                    <dd class="col-5 text-end">
+                      {{ backend.output_tokens }}
+                    </dd>
+                    {% if backend.actual_input_cost_usd is defined %}<dt class="col-7 fw-normal text-secondary">Input cost</dt><dd class="col-5 text-end">${{ '%.6f'|format(backend.actual_input_cost_usd) }}</dd>{% endif %}
+                    {% if backend.actual_output_cost_usd is defined %}<dt class="col-7 fw-normal text-secondary">Output cost</dt><dd class="col-5 text-end">${{ '%.6f'|format(backend.actual_output_cost_usd) }}</dd>{% endif %}
+                  {% else %}
+                    <dt class="col-7 fw-normal text-secondary">Input characters</dt>
+                    <dd class="col-5 text-end">
+                      {{ backend.input_characters }}
+                    </dd>
+                  {% endif %}
+                </dl>
+              </div>
+            </article>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+  <div class="row g-3 mb-3">
+    <div class="col">
+      <section class="card h-100 shadow-sm">
+        <div class="card-header">
+          <h2 class="h5 mb-0">Export history</h2>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Created</th>
+                <th>Format</th>
+                <th class="text-end">Records</th>
+                <th>File</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in report.exports.history %}
+                <tr>
+                  <td><time datetime="{{ item.created_at }}" data-local-datetime>{{ item.created_at[:19]|replace('T', ' ') }} UTC</time></td>
+                  <td class="text-uppercase">{{ item.format }}</td>
+                  <td class="text-end">{{ item.record_count }}</td>
+                  <td class="font-monospace small text-break">{{ item.output_path }}</td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="4" class="text-center text-secondary py-4">No exports yet.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+  <div class="modal fade"
+       id="configuration-dialog"
+       tabindex="-1"
+       aria-labelledby="configuration-dialog-title"
+       aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="configuration-dialog-title">Configuration JSON</h2>
+          <button class="btn-close"
+                  type="button"
+                  data-bs-dismiss="modal"
+                  aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <pre class="bg-body-tertiary border rounded p-3 mb-0">{{ configuration_json }}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% if rules_json %}
+    <div class="modal fade"
+         id="rules-dialog"
+         tabindex="-1"
+         aria-labelledby="rules-dialog-title"
+         aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title fs-5" id="rules-dialog-title">Custom rules JSON</h2>
+            <button class="btn-close"
+                    type="button"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <pre class="bg-body-tertiary border rounded p-3 mb-0" id="run-rules-json">{{ rules_json }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+  <div class="modal fade"
+       id="report-dialog"
+       tabindex="-1"
+       aria-labelledby="report-dialog-title"
+       aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="report-dialog-title">Technical report JSON</h2>
+          <button class="btn-close"
+                  type="button"
+                  data-bs-dismiss="modal"
+                  aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <pre class="bg-body-tertiary border rounded p-3 mb-0"
+               id="live-report-json">{{ report|tojson(indent=2) }}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='dashboard.js') }}" defer></script>
+{% endblock %}

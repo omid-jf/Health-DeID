@@ -1,0 +1,259 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Record {{ audit.record.record_id }} · Health-DeID{% endblock %}
+{% block content %}
+  {% set final = audit.renderings|selectattr('kind', 'equalto', 'final')|selectattr('is_stale', 'equalto', 0)|list|last %}
+  {% set draft = audit.renderings|selectattr('kind', 'equalto', 'draft')|selectattr('is_stale', 'equalto', 0)|list|last %}
+  {% set output = final or draft %}
+  <header class="d-flex justify-content-between align-items-start gap-3 mb-3">
+    <div>
+      {% set color = {'ready': 'success', 'awaiting_review': 'warning', 'failed': 'danger', 'excluded': 'secondary', 'reviewed': 'info'}.get(audit.record.status, 'primary') %}
+      <h1 class="h3 mb-1">
+        Record {{ position }} of {{ total }}
+        <span class="badge fs-6 fw-normal text-bg-{{ color }} text-capitalize">{{ audit.record.status|replace('_', ' ') }}</span>
+      </h1>
+      <p class="mb-0">
+        <strong>{{ audit.record.record_id }}</strong> · Entity ID: {{ audit.record.entity_id }} · Source row {{ audit.record.source_index + 1 }}
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      {% if audit.record.status == 'awaiting_review' %}
+        <a class="btn btn-primary"
+           href="{{ url_for('ui.review_record', run_id=context.run_id, record_id=audit.record.record_id) }}">Review record</a>
+      {% endif %}
+      <div class="btn-group" role="group" aria-label="Record navigation">
+        <a class="btn btn-outline-secondary {% if not previous_id %}disabled{% endif %}"
+           {% if previous_id %}href="{{ url_for('ui.record_audit', run_id=context.run_id, record_id=previous_id) }}"{% endif %}>Previous</a>
+        <a class="btn btn-outline-secondary {% if not next_id %}disabled{% endif %}"
+           {% if next_id %}href="{{ url_for('ui.record_audit', run_id=context.run_id, record_id=next_id) }}"{% endif %}>Next</a>
+      </div>
+    </div>
+  </header>
+  {% if audit.metadata %}
+    <div class="accordion mb-3" id="record-metadata">
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#record-metadata-body">Metadata fields ({{ audit.metadata|length }})</button>
+        </h2>
+        <div class="accordion-collapse collapse"
+             id="record-metadata-body"
+             data-bs-parent="#record-metadata">
+          <div class="accordion-body"><dl class="row mb-0">{% for name, value in audit.metadata.items() %}<dt class="col-md-3">{{ name }}</dt><dd class="col-md-9 text-break">{{ value }}</dd>{% endfor %}</dl></div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+  <section class="row g-3 mb-3">
+    <div class="col-xl-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-header">
+          <h2 class="h5 mb-0">Source text</h2>
+        </div>
+        <pre class="card-body note-text mb-0">{{ audit.record.normalized_text or '—' }}</pre>
+      </div>
+    </div>
+    <div class="col-xl-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-header">
+          <h2 class="h5 mb-0">{{ 'Final de-identified text' if final else 'Draft de-identified text' }}</h2>
+        </div>
+        <pre class="card-body note-text mb-0">{{ output.rendered_text if output else 'Not generated yet.' }}</pre>
+      </div>
+    </div>
+  </section>
+  {% if audit.source_structured_fields %}
+    <section class="row g-3 mb-3">
+      <div class="col-xl-6">
+        <div class="card h-100 shadow-sm">
+          <div class="card-header">
+            <h2 class="h5 mb-0">Source structured fields</h2>
+          </div>
+          <pre class="card-body note-text mb-0">{{ audit.source_structured_fields|tojson(indent=2) }}</pre>
+        </div>
+      </div>
+      <div class="col-xl-6">
+        <div class="card h-100 shadow-sm">
+          <div class="card-header">
+            <h2 class="h5 mb-0">Final de-identified structured fields</h2>
+          </div>
+          <pre class="card-body note-text mb-0">{% if audit.final_structured_fields is not none %}{{ audit.final_structured_fields|tojson(indent=2) }}{% else %}Not generated yet.{% endif %}</pre>
+        </div>
+      </div>
+    </section>
+  {% endif %}
+  <div class="row g-3 mb-3">
+    <div class="col-xl-7">
+      <section class="card h-100 shadow-sm">
+        <div class="card-header">
+          <h2 class="h5 mb-0">PHI findings</h2>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Category</th>
+                <th>Text</th>
+                <th>Offsets</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for finding in audit.findings %}
+                <tr>
+                  <td class="text-capitalize">{{ finding.source_kind }}</td>
+                  <td>{{ finding.canonical_category|replace('_', ' ') }}</td>
+                  <td>{{ finding.exact_text }}</td>
+                  <td>{{ finding.start_char }}–{{ finding.end_char }}</td>
+                  <td>{{ 'Active' if finding.is_eligible else 'Inactive' }}</td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="5" class="text-center text-secondary py-4">No PHI findings.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <div class="col-xl-5">
+      <section class="card h-100 shadow-sm">
+        <div class="card-header">
+          <h2 class="h5 mb-0">Validation findings</h2>
+        </div>
+        <div class="list-group list-group-flush">
+          {% for finding in audit.validation_findings %}
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between gap-2">
+                <strong>{{ finding.canonical_category|replace('_', ' ') }}</strong>
+                {% if finding.ignored_by_policy %}
+                  <span class="badge text-bg-secondary"
+                        title="This PHI category is configured to remain unchanged.">Configured to retain</span>
+                {% endif %}
+              </div>
+              <div class="small text-secondary mt-1">{{ finding.rationale }}</div>
+            </div>
+          {% else %}
+            <div class="list-group-item text-secondary">No validation findings.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </div>
+  {% if audit.review_decisions %}
+    <section class="card shadow-sm mb-3">
+      <div class="card-header">
+        <h2 class="h5 mb-0">Review history</h2>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Decision</th>
+              <th>Reviewer</th>
+              <th>Time</th>
+              <th>Recorded</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for decision in audit.review_decisions %}
+              <tr>
+                <td class="text-capitalize">{{ decision.disposition|replace('_', ' ') }}</td>
+                <td>{{ decision.reviewer_id }}</td>
+                <td>{{ decision.review_seconds|duration }}</td>
+                <td><time datetime="{{ decision.created_at }}" data-local-datetime>{{ decision.created_at[:19]|replace('T', ' ') }} UTC</time></td>
+                <td>{{ decision.record_comment or '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+  <div class="accordion mb-3" id="technical-history">
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#technical-history-body">Technical transformation history</button>
+      </h2>
+      <div class="accordion-collapse collapse"
+           id="technical-history-body"
+           data-bs-parent="#technical-history">
+        <div class="accordion-body">
+          <h3 class="h6">Text transformations</h3>
+          {% for rendering in audit.renderings %}
+            <details class="mb-2">
+              <summary>
+                {{ 'Draft de-identification' if rendering.kind == 'draft' else 'Final de-identification' }} · plan {{ rendering.plan_revision }}
+                {% if rendering.is_stale %}· superseded{% endif %}
+              </summary>
+              <pre class="note-text border rounded bg-body-tertiary p-3 mt-2">{{ rendering.rendered_text }}</pre>
+            </details>
+          {% else %}
+            <p class="text-secondary mb-0">No generated text yet.</p>
+          {% endfor %}
+          <h3 class="h6 mt-4">Structured-field transformations</h3>
+          {% if audit.structured_transform_events or audit.review_structured_events %}
+            <div class="table-responsive border rounded">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Field</th>
+                    <th>Category</th>
+                    <th>Original</th>
+                    <th>Replacement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for event in audit.structured_transform_events %}
+                    <tr>
+                      <td>{{ 'Draft' if event.purpose == 'draft' else 'Final' }} plan {{ event.plan_revision }}</td>
+                      <td>{{ event.column_name }}</td>
+                      <td>{{ event.canonical_category|replace('_', ' ') }}</td>
+                      <td class="text-break">{{ event.original_value }}</td>
+                      <td class="text-break">{{ event.replacement_value }}</td>
+                    </tr>
+                  {% endfor %}
+                  {% for event in audit.review_structured_events %}
+                    <tr>
+                      <td>Human review</td>
+                      <td>{{ event.column_name }}</td>
+                      <td>{{ event.category|replace('_', ' ') }}</td>
+                      <td class="text-break">{{ event.original_value }}</td>
+                      <td class="text-break">{{ event.replacement_value }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p class="text-secondary mb-0">No structured-field transformations.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% if audit.record.status == 'failed' %}
+    <section class="card border-danger mb-3">
+      <div class="card-body d-flex justify-content-between align-items-center gap-3">
+        <div>
+          <h2 class="h5">Retry failed work</h2>
+          <p class="mb-0 text-secondary">Reset this record’s earliest retryable stage and downstream work.</p>
+        </div>
+        <form method="post"
+              action="{{ url_for('ui.retry_record', run_id=context.run_id, record_id=audit.record.record_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button class="btn btn-danger" type="submit">Retry record</button>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

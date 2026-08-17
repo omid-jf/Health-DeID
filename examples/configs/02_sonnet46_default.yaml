@@ -1,0 +1,39 @@
+config_version: 1
+
+run:
+  name: sonnet46-default
+  output_dir: example-runs
+
+input:
+  path: examples/data/sample_notes.jsonl
+  format: jsonl
+  record_id_column: note_id
+  entity_id:
+    source: column
+    column: patient_id
+  text_column: note_text
+  metadata_columns:
+    - service_date
+    - note_type
+  structured_phi_columns:
+    service_date: DATE
+
+detection:
+  enabled: true
+  detectors:
+    - backend: aws_bedrock
+      region_name: us-east-1
+      min_confidence: 0.0
+      input_cost_per_million_tokens: 3.0
+      output_cost_per_million_tokens: 15.0
+  execution:
+    workers: 2
+
+rules:
+  enabled: false
+
+validation:
+  enabled: false
+
+review:
+  enabled: false

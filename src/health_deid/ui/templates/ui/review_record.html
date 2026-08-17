@@ -1,0 +1,296 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Review {{ record.record_id }} · Health-DeID{% endblock %}
+{% block content %}
+  <header class="d-flex justify-content-between align-items-start gap-3 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Record {{ position }} of {{ total }}</h1>
+      <p class="mb-0">
+        <strong>{{ record.record_id }}</strong> · Entity ID: {{ record.entity_id }}
+      </p>
+    </div>
+    <div class="card"
+         id="review-timer"
+         data-url="{{ url_for('ui.review_timer', run_id=context.run_id, record_id=record.record_id) }}"
+         data-csrf="{{ csrf_token }}"
+         data-seconds="{{ workspace.review_seconds }}"
+         data-running="{{ 'true' if workspace.timer_started_at else 'false' }}">
+      <div class="card-body d-flex align-items-center gap-2 py-2">
+        <span class="small text-secondary">Review time</span>
+        <button class="btn btn-outline-secondary btn-sm"
+                id="timer-minus"
+                type="button"
+                aria-label="Subtract one minute">−1 min</button>
+        <input class="form-control form-control-sm font-monospace timer-input"
+               id="timer-value"
+               type="text"
+               inputmode="numeric"
+               autocomplete="off"
+               aria-label="Review time in hours, minutes, and seconds" />
+        <button class="btn btn-outline-secondary btn-sm"
+                id="timer-plus"
+                type="button"
+                aria-label="Add one minute">+1 min</button>
+        <button class="btn btn-outline-primary btn-sm"
+                id="timer-toggle"
+                type="button">{{ 'Pause' if workspace.timer_started_at else 'Start' }}</button>
+        <button class="btn btn-outline-secondary btn-sm"
+                id="timer-restart"
+                type="button">Restart</button>
+      </div>
+    </div>
+  </header>
+  <div class="accordion mb-3" id="review-details">
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#review-details-body">Annotation instructions and record metadata</button>
+      </h2>
+      <div class="accordion-collapse collapse"
+           id="review-details-body"
+           data-bs-parent="#review-details">
+        <div class="accordion-body">
+          <p>Click highlighted PHI to remove it. To add PHI, select exact source text and choose a category.</p>
+          <dl class="row mb-0"><dt class="col-md-3">Record ID</dt><dd class="col-md-9">{{ record.record_id }}</dd><dt class="col-md-3">Entity ID</dt><dd class="col-md-9">{{ record.entity_id }}</dd>{% for name, value in metadata.items() %}<dt class="col-md-3">{{ name }}</dt><dd class="col-md-9 text-break">{{ value }}</dd>{% endfor %}</dl>
+        </div>
+      </div>
+    </div>
+  </div>
+  <form method="post" id="review-decision">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <input type="hidden"
+           name="basis_plan_revision"
+           value="{{ record.plan_revision }}" />
+    <input type="hidden"
+           name="span_events"
+           id="span-events"
+           value="{{ workspace_payload.span_events|tojson|forceescape }}" />
+    <input type="hidden"
+           name="structured_events"
+           id="structured-events"
+           value="{{ workspace_payload.structured_events|tojson|forceescape }}" />
+    <section id="review-editor"
+             data-source-text="{{ record.normalized_text|tojson|forceescape }}"
+             data-span-groups="{{ span_groups|tojson|forceescape }}"
+             data-workspace="{{ workspace_payload|tojson|forceescape }}"
+             data-policy="{{ policy|tojson|forceescape }}"
+             data-placeholders="{{ placeholders|tojson|forceescape }}"
+             data-category-colors="{{ phi_colors|tojson|forceescape }}"
+             data-preview-url="{{ url_for('ui.review_preview', run_id=context.run_id, record_id=record.record_id) }}"
+             data-csrf="{{ csrf_token }}">
+      <div class="row g-3 mb-3">
+        <div class="col-xl-6">
+          <section class="card h-100 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+              <div>
+                <h2 class="h5 mb-0">Source text</h2>
+              </div>
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" id="next-phi" type="button">Next PHI</button>
+                <button class="btn btn-outline-secondary" id="undo-change" type="button">Undo</button>
+                <button class="btn btn-outline-secondary" id="reset-changes" type="button">Reset</button>
+              </div>
+            </div>
+            <div class="card-body note-text review-source"
+                 id="review-source"
+                 tabindex="0"></div>
+            <div class="card-footer bg-body">
+              <div class="small text-secondary mb-2">Add selected text as:</div>
+              <div class="d-flex flex-wrap gap-1"
+                   role="group"
+                   aria-label="Add selected text as PHI">
+                {% for category in categories %}
+                  <button class="btn btn-outline-{{ phi_colors.get(category, 'secondary') }} btn-sm category-button"
+                          type="button"
+                          data-category="{{ category }}">{{ category|replace('_', ' ') }}</button>
+                {% endfor %}
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="col-xl-6">
+          <section class="card h-100 shadow-sm">
+            <div class="card-header">
+              <h2 class="h5 mb-0">Draft de-identified text</h2>
+            </div>
+            <pre class="card-body note-text mb-0" id="review-output"></pre>
+          </section>
+        </div>
+      </div>
+    </section>
+    <div class="accordion mb-3" id="review-baseline">
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#review-baseline-body">Baseline before review</button>
+        </h2>
+        <div class="accordion-collapse collapse"
+             id="review-baseline-body"
+             data-bs-parent="#review-baseline">
+          <pre class="accordion-body note-text mb-0">{{ record.pipeline_text }}</pre>
+        </div>
+      </div>
+    </div>
+    {% if record.structured_fields %}
+      <section class="card shadow-sm mb-3">
+        <div class="card-header">
+          <h2 class="h5 mb-0">Structured PHI fields</h2>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0" id="structured-review-table">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Original</th>
+                <th>Category</th>
+                <th>Configured action</th>
+                <th>Output preview</th>
+                <th>Reviewer action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for field in record.structured_fields %}
+                <tr data-structured-field
+                    data-column="{{ field.column_name }}"
+                    data-category="{{ field.category }}"
+                    data-original="{{ field.original_value|tojson|forceescape }}"
+                    data-baseline="{{ field.deidentified_value|tojson|forceescape }}">
+                  <th scope="row" class="fw-semibold">{{ field.column_name }}</th>
+                  <td>{{ field.original_value }}</td>
+                  <td>{{ field.category|replace('_', ' ') }}</td>
+                  <td>{{ field.action|replace('_', ' ') |title }}</td>
+                  <td data-structured-preview>{{ field.deidentified_value }}</td>
+                  <td>
+                    <select class="form-select form-select-sm"
+                            data-structured-action
+                            aria-label="Reviewer action for {{ field.column_name }}">
+                      <option value="baseline">Use baseline</option>
+                      <option value="redact">Redact</option>
+                      <option value="original">Keep original</option>
+                      <option value="custom">Custom value</option>
+                    </select>
+                    <input class="form-control form-control-sm mt-2"
+                           type="text"
+                           data-structured-custom
+                           aria-label="Custom value for {{ field.column_name }}"
+                           hidden />
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+    <div class="row g-3 mb-3">
+      <div class="col-xl-4">
+        <section class="card h-100 shadow-sm">
+          <div class="card-header">
+            <h2 class="h5 mb-0">Pending PHI changes</h2>
+          </div>
+          <div class="card-body">
+            <ul class="mb-0" id="pending-events">
+              <li>No changes</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+      {% if record.validation_findings %}
+        <div class="col-xl-8">
+          <section class="card h-100 shadow-sm">
+            <div class="card-header">
+              <h2 class="h5 mb-0">Validation findings</h2>
+            </div>
+            <div class="list-group list-group-flush">
+              {% set outcomes = [('confirmed', 'Confirmed PHI'), ('rejected', 'Not PHI'), ('partially_confirmed', 'Partially confirmed')] %}
+              {% for finding in record.validation_findings %}
+                {% set saved = validation_review_map.get(finding.validation_finding_id, {}) %}
+                <article class="list-group-item">
+                  <div class="d-flex justify-content-between gap-2">
+                    <strong>{{ finding.canonical_category|replace('_', ' ') }}</strong>
+                    {% if finding.ignored_by_policy %}
+                      <span class="badge text-bg-secondary"
+                            title="This PHI category is configured to remain unchanged.">Configured to retain</span>
+                    {% endif %}
+                  </div>
+                  <p class="small text-secondary my-2">
+                    {{ finding.rationale }}
+                    {% if finding.evidence %}Evidence: {{ finding.evidence }}{% endif %}
+                  </p>
+                  <div class="row g-2">
+                    <div class="col-md-4">
+                      <label class="form-label small" for="outcome-{{ loop.index }}">Decision</label>
+                      <select class="form-select form-select-sm"
+                              id="outcome-{{ loop.index }}"
+                              name="outcome:{{ finding.validation_finding_id }}">
+                        <option value="">Not decided</option>
+                        {% for value, label in outcomes %}
+                          <option value="{{ value }}"
+                                  {% if saved.get('outcome') == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label small" for="comment-{{ loop.index }}">Comment</label>
+                      <input class="form-control form-control-sm"
+                             id="comment-{{ loop.index }}"
+                             name="comment:{{ finding.validation_finding_id }}"
+                             value="{{ saved.get('comment', '') }}" />
+                    </div>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+      {% endif %}
+    </div>
+    <section class="card shadow-sm mb-3">
+      <div class="card-body">
+        <label class="form-label" for="record-comment">Review note</label>
+        <textarea class="form-control"
+                  id="record-comment"
+                  name="record_comment"
+                  rows="2"
+                  placeholder="Optional note about this decision">{{ workspace.record_comment or '' }}</textarea>
+      </div>
+    </section>
+    <footer class="sticky-bottom bg-body-tertiary border-top py-3">
+      <div class="d-flex justify-content-between align-items-center gap-3">
+        <div class="btn-group">
+          <a class="btn btn-outline-secondary {% if not previous_id %}disabled{% endif %}"
+             {% if previous_id %}href="{{ url_for('ui.review_record', run_id=context.run_id, record_id=previous_id) }}"{% endif %}>Previous</a>
+          <a class="btn btn-outline-secondary"
+             href="{{ url_for('ui.review_queue', run_id=context.run_id) }}">Queue</a>
+          <a class="btn btn-outline-secondary {% if not next_id %}disabled{% endif %}"
+             {% if next_id %}href="{{ url_for('ui.review_record', run_id=context.run_id, record_id=next_id) }}"{% endif %}>Next</a>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary"
+                  type="submit"
+                  formaction="{{ url_for('ui.save_review_draft', run_id=context.run_id, record_id=record.record_id) }}">Save for later</button>
+          <button class="btn btn-outline-danger"
+                  type="submit"
+                  name="action"
+                  value="exclude"
+                  formaction="{{ url_for('ui.decide_review', run_id=context.run_id, record_id=record.record_id) }}">Exclude</button>
+          <button class="btn btn-outline-primary"
+                  type="submit"
+                  name="action"
+                  value="approve"
+                  formaction="{{ url_for('ui.decide_review', run_id=context.run_id, record_id=record.record_id) }}">Approve unchanged</button>
+          <button class="btn btn-primary"
+                  type="submit"
+                  name="action"
+                  value="correct"
+                  formaction="{{ url_for('ui.decide_review', run_id=context.run_id, record_id=record.record_id) }}">Save corrections</button>
+        </div>
+      </div>
+    </footer>
+  </form>
+  <script src="{{ url_for('static', filename='review-ui.js') }}" defer></script>
+{% endblock %}

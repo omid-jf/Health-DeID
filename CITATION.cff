@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use Health-DeID in research, please cite the software."
+title: "Health-DeID"
+type: software
+version: 1.0.0
+date-released: 2026-08-17
+authors:
+  - family-names: Jafari
+    given-names: Omid
+repository-code: "https://github.com/omid-jf/Health-DeID"
+url: "https://github.com/omid-jf/Health-DeID"
+license: AGPL-3.0-or-later

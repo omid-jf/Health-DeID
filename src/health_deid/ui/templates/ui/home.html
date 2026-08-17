@@ -1,0 +1,63 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Runs · Health-DeID{% endblock %}
+{% block content %}
+  <div class="mb-3">
+    <h1 class="h3 mb-1">Runs</h1>
+    <p class="text-secondary mb-0">Runs saved in the configured runs folder.</p>
+  </div>
+  <section class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Run</th>
+            <th scope="col">Status</th>
+            <th scope="col">Records</th>
+            <th scope="col">Type</th>
+            <th scope="col">Updated</th>
+            <th scope="col"><span class="visually-hidden">Open</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in runs %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ run.name or run.run_id }}</div>
+                <small class="font-monospace text-secondary">{{ run.run_id }}</small>
+              </td>
+              <td>
+                {% set color = {
+                  'completed': 'success',
+                  'running': 'primary',
+                  'awaiting_review': 'warning',
+                  'completed_with_errors': 'warning',
+                  'failed': 'danger',
+                  'blocked': 'danger'
+                }.get(run.status, 'secondary') %}
+                <span class="badge text-bg-{{ color }} text-capitalize">{{ run.status|replace('_', ' ') }}</span>
+              </td>
+              <td>{{ run.ready_count }} ready of {{ run.record_count }}</td>
+              <td>{{ "Revised run" if run.parent_run_id else "Original run" }}</td>
+              <td>
+                <time datetime="{{ run.updated_at }}" data-local-datetime>
+                  {{ run.updated_at[:19]|replace('T', ' ') }} UTC
+                </time>
+              </td>
+              <td class="text-end">
+                <a class="btn btn-outline-primary btn-sm"
+                   href="{{ url_for('ui.dashboard', run_id=run.run_id) }}">Open</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-secondary py-5">
+                No runs yet. Create one to get started.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

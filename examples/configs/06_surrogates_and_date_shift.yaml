@@ -1,0 +1,104 @@
+config_version: 1
+
+run:
+  name: surrogates-date-shift
+  output_dir: example-runs
+
+input:
+  path: examples/data/sample_notes.jsonl
+  format: jsonl
+  record_id_column: note_id
+  entity_id:
+    source: column
+    column: patient_id
+  text_column: note_text
+  metadata_columns:
+    - service_date
+    - note_type
+  structured_phi_columns:
+    service_date: DATE
+
+policy:
+  policy_version: 1
+  categories:
+    NAME:
+      action: surrogate
+      surrogate:
+        method: custom_list
+        consistency: entity
+        values:
+          - Avery Morgan
+          - Cameron Reed
+          - Jordan Patel
+          - Morgan Lee
+          - Riley Brooks
+          - Taylor Nguyen
+          - Casey Rivera
+          - Jamie Collins
+          - Quinn Foster
+          - Rowan Bennett
+          - Skyler Hayes
+          - Drew Sullivan
+        secret_reference: literal:health-deid-example-name-key
+    DATE:
+      action: surrogate
+      surrogate:
+        method: date_shift
+        consistency: entity
+        minimum_weeks: -26
+        maximum_weeks: 26
+        fallback: year_only
+        secret_reference: literal:health-deid-example-date-key
+    AGE:
+      action: generalize
+      generalization: age_90_plus
+    ID:
+      action: surrogate
+      surrogate:
+        method: faker
+        consistency: entity
+        secret_reference: literal:health-deid-example-id-key
+    LOCATION:
+      action: redact
+    PHONE_OR_FAX:
+      action: redact
+    EMAIL:
+      action: redact
+    URL:
+      action: redact
+    IP_ADDRESS:
+      action: redact
+    BIOMETRIC:
+      action: redact
+    PHOTO:
+      action: redact
+    OTHER_ID:
+      action: surrogate
+      surrogate:
+        method: faker
+        consistency: record
+        secret_reference: literal:health-deid-example-other-id-key
+    PROFESSION:
+      action: retain
+    UNMAPPED:
+      action: redact
+
+detection:
+  enabled: true
+  detectors:
+    - backend: aws_comprehend_medical
+      region_name: us-east-1
+      min_confidence: 0.0
+      cost_per_100_characters_usd: 0.0014
+  execution:
+    workers: 2
+
+rules:
+  enabled: true
+  rules_path: examples/rules/custom_rules.yaml
+
+validation:
+  enabled: false
+
+review:
+  enabled: false
