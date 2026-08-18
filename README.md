@@ -169,9 +169,22 @@ pass when they do not.
 See the [examples](https://github.com/omid-jf/Health-DeID/blob/main/examples/README.md)
 for thirteen configurations using fictional records.
 
+## Research use case
+
+Health-DeID was used to prepare de-identified fine-tuning text for two research
+models for VTE phenotype classification:
+
+- [VTE-BERT-DeID](https://huggingface.co/omid-jf/VTE-BERT-DeID)
+- [VTE-ModernBERT-DeID](https://huggingface.co/omid-jf/VTE-ModernBERT-DeID)
+
+Both models were fine-tuned on de-identified clinical text and evaluated on the
+corresponding original held-out clinical text. The “DeID” suffix describes the
+fine-tuning data; these models classify VTE phenotypes and do not perform
+de-identification.
+
 ## Documentation
 
-See the [documentation](https://omid-jf.github.io/health-deid/) for the full user guide,
+See the [documentation](https://omid-jf.github.io/Health-DeID/) for the full user guide,
 API, and module reference (generated with Sphinx).
 
 ## Acknowledgements
